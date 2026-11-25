@@ -1,0 +1,21 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local backups & temp outputs
+*.bak
+*.bak.*
+.tmp/
+tmp/
+
+# Secrets / machine-local configs (never commit real credentials or host settings)
+.env
+.env.*
+auth.json
+config.toml
+settings.json
+*.local.json
+*.local.toml

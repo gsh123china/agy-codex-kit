@@ -1,0 +1,8 @@
+# ~/.codex/config.toml 脱敏参考示例（请勿提交含 API Key 或私有地址的真实文件）
+
+# model = "gpt-5.4"
+# model_reasoning_effort = "xhigh"
+
+# 若在非隔离环境需要限制 Codex 写入 /tmp，可取消注释：
+# [sandbox_workspace_write]
+# exclude_slash_tmp = true
