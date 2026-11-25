@@ -17,6 +17,7 @@ agy-codex-kit/
 ├── install.sh                                  # 幂等软链部署脚本（自动备份旧文件，支持 --uninstall）
 ├── antigravity/                                # 自动软链到 ~/.gemini/
 │   ├── GEMINI.md                               # -> ~/.gemini/GEMINI.md（全局角色分工与架构权衡原则）
+│   ├── statusline.sh                           # -> ~/.gemini/antigravity-cli/statusline.sh（底部状态栏，展示已用上下文大小）
 │   └── skills/
 │       └── codex-executor/                     # -> ~/.gemini/config/skills/codex-executor
 │           ├── SKILL.md                        # 设计审查 / 任务派发 / 验收闭环 SOP

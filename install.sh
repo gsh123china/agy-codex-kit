@@ -39,6 +39,7 @@ done
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 SKILLS_TARGET_DIR="$GEMINI_HOME/config/skills"
+CLI_HOME="$GEMINI_HOME/antigravity-cli"
 BACKUP_ROOT="$GEMINI_HOME/backups/agy-codex-kit-$(date +%Y%m%d-%H%M%S)"
 BACKUP_USED=0
 
@@ -98,6 +99,9 @@ unlink_if_ours() {
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling agy-codex-kit symlinks from $GEMINI_HOME ..."
   unlink_if_ours "$REPO_DIR/antigravity/GEMINI.md" "$GEMINI_HOME/GEMINI.md"
+  if [[ -f "$REPO_DIR/antigravity/statusline.sh" ]]; then
+    unlink_if_ours "$REPO_DIR/antigravity/statusline.sh" "$CLI_HOME/statusline.sh"
+  fi
   for skill_dir in "$REPO_DIR"/antigravity/skills/*; do
     [[ -d "$skill_dir" && -f "$skill_dir/SKILL.md" ]] || continue
     skill_name="$(basename "$skill_dir")"
@@ -109,12 +113,16 @@ fi
 
 echo "Installing agy-codex-kit from $REPO_DIR -> $GEMINI_HOME ..."
 
-# Ensure helper scripts inside skills are executable
+# Ensure helper scripts are executable
+[[ -f "$REPO_DIR/antigravity/statusline.sh" ]] && chmod +x "$REPO_DIR/antigravity/statusline.sh"
 for script in "$REPO_DIR"/antigravity/skills/*/scripts/*.sh; do
   [[ -f "$script" ]] && chmod +x "$script"
 done
 
 link_item "$REPO_DIR/antigravity/GEMINI.md" "$GEMINI_HOME/GEMINI.md" "GEMINI.md"
+if [[ -f "$REPO_DIR/antigravity/statusline.sh" ]]; then
+  link_item "$REPO_DIR/antigravity/statusline.sh" "$CLI_HOME/statusline.sh" "antigravity-cli/statusline.sh"
+fi
 
 for skill_dir in "$REPO_DIR"/antigravity/skills/*; do
   [[ -d "$skill_dir" && -f "$skill_dir/SKILL.md" ]] || continue
@@ -124,7 +132,7 @@ done
 
 echo ""
 echo "=== Environment Check ==="
-for bin in agy codex git; do
+for bin in agy codex git jq; do
   if command -v "$bin" >/dev/null 2>&1; then
     echo "[ok]      $bin: $(command -v "$bin")"
   else
