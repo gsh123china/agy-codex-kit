@@ -20,13 +20,13 @@ agy-codex-kit/
 │   ├── statusline.sh                           # -> ~/.gemini/antigravity-cli/statusline.sh（底部状态栏，展示已用上下文大小）
 │   └── skills/
 │       └── codex-executor/                     # -> ~/.gemini/config/skills/codex-executor
-│           ├── SKILL.md                        # 设计审查 / 任务派发 / 验收闭环 SOP
+│           ├── SKILL.md                        # 设计审查 / 拆单派发 / 写审分离验收 / 溯源闭环 SOP
 │           └── scripts/
-│               └── run-codex.sh                # 封装 codex exec（--review / --resume / --effort / --safe）
-├── templates/                                  # 新代码仓库初始化模板（按需拷贝）
-│   ├── AGENTS.md.template                      # Antigravity 与 Codex 共同读取的仓库契约
-│   ├── design-doc.md.template                  # 给 --review 只读审查用的设计方案模板
-│   └── task-spec.md.template                   # 含 Non-Goals 与验收命令的原子任务单模板
+│               └── run-codex.sh                # 封装 codex exec（--review / --code-review / --resume / --effort / --safe）
+├── templates/                                  # 新代码仓库初始化模板（一页可读，原地更新）
+│   ├── AGENTS.md.template                      # 共读仓库契约（模块数据归属、不变量、关键决策溯源）
+│   ├── design-doc.md.template                  # 短设计方案模板（意图红线、快慢层边界、否决方案、行为评估）
+│   └── task-spec.md.template                   # 原子任务单模板（Non-Goals、禁改测试标准、强制汇报自行假设）
 ├── examples/                                   # 脱敏配置参考（绝不自动覆盖宿主机）
 │   ├── codex.config.toml.example               # ~/.codex/config.toml 参考
 │   └── antigravity.settings.json.example       # ~/.gemini/antigravity-cli/settings.json 参考
@@ -70,14 +70,17 @@ cd ~/agy-codex-kit
 
 ### 常用派单命令
 ```bash
-# 1. 设计方案只读 Review（不改代码，输出分级风险与复杂度代价）
+# 1. 编码前：设计方案只读 Review（不改代码，输出分级风险与复杂度代价）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --review --effort xhigh docs/design/feature.md .
 
-# 2. 派发原子任务单落地实现
+# 2. 编码中：派发原子任务单落地实现（强制汇报自行假设 Unstated Decisions）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --effort xhigh docs/tasks/T01.md .
 
-# 3. 验收未通过时续接上次 session 定向返工
+# 3. 小偏差返工：续接上次 session 定向修复（同一问题最多连续 --resume 2 次，超限回退重开新会话）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --resume <session-id> --effort xhigh docs/tasks/T01-rework.md .
+
+# 4. 编码后（慢层/高风险改动按需调用）：独立干净会话只读代码审查（写审分离）
+bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --code-review --effort xhigh docs/tasks/T01.md .
 ```
 
 ### 多机同步与留档

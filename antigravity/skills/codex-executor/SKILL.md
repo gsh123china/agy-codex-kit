@@ -1,87 +1,89 @@
 ---
 name: codex-executor
 description: >-
-  Use this skill when delegating codebase-grounded design reviews or concrete
-  code implementation, refactoring, unit testing, and bug-fixing tasks to
-  OpenAI Codex CLI while Antigravity acts as the project orchestrator,
-  architect, and final reviewer.
+  Use this skill when delegating codebase-grounded design reviews, independent
+  post-implementation code reviews, or concrete code implementation,
+  refactoring, testing, and bug-fixing tasks to OpenAI Codex CLI while
+  Antigravity acts as the project orchestrator, architect, and final reviewer.
 ---
 
-# Codex 协作、设计审查与任务派发 SOP（方案 A）
+# Codex 协作、审查与任务派发 SOP（方案 A）
 
-本 Skill 用于在“Antigravity 统筹设计 + Codex 审查/落地”的模式下，利用 Codex 对代码仓库分析严谨、幻觉少的优势做设计把关，并以可控、可审计的方式派发实现任务与完成验收闭环。
+本 Skill 用于在“Antigravity 守住系统真相与判断 + Codex 严谨审查与实现”的模式下，消除双层委托中的隐性假设（Gap），并以可控、写审分离、可溯源的方式完成代码交付闭环。
 
-## 0. 适用边界（派单前先判断）
+## 0. 适用边界与快慢层分级（派单前先判断）
 
-- **适合交给 Codex**：仓库事实审查、后端/核心业务逻辑实现、重构、单测编写、复杂 Bug 修复等偏工程严谨性的任务。
-- **不要交给 Codex**：UI/UX 界面设计、样式与视觉审美调优、交互动效、视频生成/动画编排等创意与审美要求高的场景，以及面向人类阅读的文章、文档与用户交互文案（由 Antigravity 直接负责；若前后端混合任务包含纯逻辑/接口/单测，只拆分纯逻辑部分给 Codex）。
+- **适合交给 Codex**：仓库事实核查、独立代码复审、后端/核心业务逻辑实现、重构、行为测试编写、复杂 Bug 修复等偏工程严谨性的任务。
+- **不要交给 Codex**：UI/UX 界面设计、样式与视觉审美调优、交互动效、视频生成/动画编排等高创意审美场景，面向人类阅读的文章/讲义/交互文案，以及 15 行以内的极小改动（由 Antigravity 直接处理；混合型前端任务仅将纯逻辑/接口/测试拆给 Codex）。
+- **演进速率（快层 vs 慢层）与删除风险**：
+  - **快层**（低耦合展示、辅助工具、局部内部实现）：轻量对齐后直接拆单（`--effort xhigh`），不套繁琐文档。
+  - **慢层**（核心数据结构、跨模块公共契约、鉴权/并发/资金与数据完整性、替换底层依赖库）与**删除旧功能/旧代码**：爆炸半径大，动手前必须核查代码内外的隐性依赖（“如果它变了或消失了，谁会注意到？”），强制走第 2 步前置 `--review`，落地后建议追加 `--code-review` 独立复审。
 
 ## 1. 准备共享上下文（首次进入项目时）
 
-在向某个代码仓库首次派单前，检查仓库根目录是否存在 `AGENTS.md`：
-- `AGENTS.md` 会被 Antigravity 和 Codex 共同读取，应记录项目目录结构、技术栈、构建/测试命令和编码约定。
-- 若项目尚未建立 `AGENTS.md` 且属于多步骤开发任务，先创建一份精简版，减少 Codex 走弯路。
+首次向某代码仓库派单前，检查仓库根目录是否存在 `AGENTS.md`：
+- `AGENTS.md` 由 Antigravity 和 Codex 共同读取，用于固化“目标架构（编译）”与核心契约：模块边界与**数据归属（哪份数据只归谁写）**、构建/测试命令、核心不变量与关键决策溯源。
+- 若多步骤开发项目尚无 `AGENTS.md`，先按模板建立一页以内的精简版。
 
-## 2. 设计方案前置 Review 与架构权衡（中大型/复杂改动必做）
+## 2. 需求对齐、前置 `--review` 与架构权衡（中大型 / 慢层改动必做）
 
-在完成架构/设计方案文档（如 `docs/design/<feature>.md`）后、正式拆分实现任务前，先交由 Codex 做**只读设计 Review**：
+1. **先消除第一层 Gap（人 ↔ Antigravity）**：
+   - 克制扩范围冲动，先列清“本次做什么”与“明确不做什么”。
+   - 对模糊地带用**三条门槛**区分 **Defaults** 与 **Gap**：① 回退代价高或危险（钱、数据完整性、删除、安全、对外契约）；② 内行外人看了会觉得莫名其妙（魔法数字、苛刻限制、特定时序）；③ 跨模块边界或数据归属约束。命中任一条的向用户问清拍板并写入设计稿（一页以内，让人读完能拍板）；无关紧要的实现细节归入 Defaults 自行定夺。
+2. **执行只读设计 Review**：
+   ```bash
+   bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --review --effort xhigh <design-doc> [workdir]
+   ```
+   （复杂架构或高爆炸半径慢层改造改传 `--effort max`。）
+3. **理性裁剪（绝不盲目照单全收）**：
+   读完 `REPORT_FILE` 后分三档裁决：
+   - **必改项（Adopt）**：与现有代码库不符的事实错误、跨边界冲突、主路径缺陷、安全或数据一致性隐患 → 直接修订设计稿。
+   - **审慎权衡项（Trade-off）**：极端临界条件或防御兜底 → 权衡“触发概率与后果” vs “理解与维护成本”；代价过高时优先靠清晰接口契约/前置假设约束。
+   - **明确驳回项（Reject → 写入 Non-Goals 与否决记录）**：得不偿失的过度防御建议 → 写入实现任务单的 `Non-Goals` 防止编码阶段自行补回；若该取舍命中“三条门槛”，把**否决的方案与理由**同步留痕到设计稿，防后续会话重踩。
+
+## 3. 编写原子任务单（骨架先行 + 行为评估）
+
+- **拆单接缝原则**：按“能独立变化的决策 + 数据归属”划分单元，切忌按代码体积切得过碎；多模块新功能先派一条端到端走通的**最简骨架单（Walking Skeleton）**把接缝集成提前验证，再逐模块填细节（一单只做一件事，对应一个干净 Codex 会话）。
+- 将单个可独立验收的任务写入 `docs/tasks/<task-id>.md`（不留仓库时写到 `/tmp/codex-tasks/<task-id>.md`），必须包含：
+  1. **目标与背景**：要兑现什么行为承诺（若是止损重开单，写明此前试过何种做法及不可行原因）。
+  2. **修改范围**：允许修改/新增的文件路径，以及明确禁止触碰的模块或测试基线。
+  3. **设计约束**：接口签名、数据归属约束，并明令**禁止为迎合实现而删改、放宽既有测试断言或验收标准**。
+  4. **明确不做（Non-Goals）**：明确排除的极端边界与过度防御代码，禁止顺手加未拍板功能。
+  5. **验收标准（行为评估优先）**：给出可直接执行的验收命令；新增测试优先验证边界上的**外部可观测行为与不变量**（换一种内部实现依然有效），而非绑死私有函数调用。
+
+## 4. 派发给 Codex 执行（含两次止损熔断规则）
+
+调用封装脚本 [run-codex.sh](./scripts/run-codex.sh)：
 
 ```bash
-bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --review <design-doc> [workdir]
+bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --effort xhigh <task-file> [workdir]
 ```
 
-- `--review` 模式强制使用 `--sandbox read-only`，仅审查不改代码，重点请 Codex 对照真实代码库核查：事实偏差、现有接口/依赖冲突、遗漏调用点与潜在边界风险，并标出每条问题的严重级别与实现复杂度代价。
-- **架构权衡（绝不盲目照单全收）**：
-  Codex 容易对极端临界情况提出大量防御式编程建议。读完 `REPORT_FILE` 后，必须按以下三档逐条裁决：
-  1. **必改项（Adopt）**：事实性错误、与现有代码冲突、主路径 Bug、安全或数据一致性隐患 → 直接修订设计方案。
-  2. **审慎权衡项（Trade-off）**：极端临界条件或防御式兜底 → 权衡“发生概率与后果” vs “代码复杂度暴涨、可读性与可维护性下降”；代价过高时优先通过清晰的接口契约/前置假设约束，而非堆砌防御逻辑。
-  3. **明确驳回项（Reject → 写入 Non-Goals）**：得不偿失的过度防御建议 → 不采纳，并在后续实现任务单的 **Non-Goals / 明确不做** 中写明取舍理由，防止 Codex 在写代码时自行补回防御逻辑。
+常用参数：
+- `--review`：编码前只读设计方案审查（强制 `--sandbox read-only`，与 `--code-review`、`--resume` 互斥）。
+- `--code-review`：编码后独立只读代码复审（强制 `--sandbox read-only`，开启未见过原编码推理过程的全新会话，对照任务单与 `git status`/`git diff` 从严挑错，适合慢层/高风险改动）。
+- `--resume <session-id>`：基于上次输出中的 `session id:` 续接原会话做定向小返工。
+  - **两次止损重开铁律**：同一问题使用 `--resume` 连续纠偏**最多不超过 2 次**！若两次返工仍未通过或改动出现矛盾发散，立即停止向该受污染会话发第三次指令：仅撤销可确认属于本任务的污染改动（严禁盲目全量 `git reset/checkout` 误伤用户原有的未提交修改；归属不清时先停手报告），审视任务单是否含糊，把失败教训写进新任务单，**不带 `--resume` 开启全新会话**重来。
+- `--effort <low|medium|high|xhigh|max>`：每次**显式指定**推理强度（不依赖本地默认值）：常规实现/审查用 `xhigh`；复杂架构、慢层高危改造或疑难并发 Bug 用 `max`；极小机械验证可降为 `high`/`medium`。
+- `--safe`：实现模式下降级为 `--sandbox workspace-write`（默认 `--dangerously-bypass-approvals-and-sandbox` 适配可回退 VM 无人值守执行）。
+- `--model <model>`：临时覆盖 Codex 模型。
 
-## 3. 编写原子任务单
+执行提示：`codex exec` 耗时较长，`run_command` 建议设置 `NotificationTimeoutSeconds`（如 180~300 秒）异步等待完成通知，勿循环轮询。
 
-将单个可独立验收的任务写入 Markdown 文件：
-- 默认放在当前项目的 `docs/tasks/<task-id>.md`（若不想在仓库内留任务文件，可写到 `/tmp/codex-tasks/<task-id>.md`）。
-- 任务单必须包含以下 5 个部分：
-  1. **目标与背景**：要解决什么问题、做到什么程度。
-  2. **修改范围**：允许修改/新增的文件路径，以及明确禁止触碰的文件或模块。
-  3. **设计约束**：接口签名、数据结构、核心错误处理要求。
-  4. **明确不做（Non-Goals）**：经设计 Review 权衡后决定不处理的极端边界，明确禁止过度防御式编程，保持代码简洁可维护。
-  5. **验收标准**：必须给出可直接执行的命令（如 `pytest`、`npm test`、`go test ./...`、构建/lint 命令）。
+## 5. 强制验收闭环、筛除 Gap 与把知识搬出会话
 
-## 4. 派发给 Codex 执行
+Codex 退出后，**必须依次完成以下动作**，不得跳过：
 
-调用配套脚本 [run-codex.sh](./scripts/run-codex.sh)：
-
-```bash
-bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh <task-file> [workdir]
-```
-
-常用可选参数：
-- `--review`：只读设计审查模式（使用 `--sandbox read-only`，不修改任何文件）。
-- `--resume <session-id>`：基于上次输出中的 `session id:` 续接原会话做定向返工，无需重新全量扫描仓库。
-- `--effort <low|medium|high|xhigh|max>`：每次派单按任务复杂度**显式指定** Codex 推理强度（不依赖本地默认配置）：
-  - 常规实现、常规升级、常规设计 Review：`--effort xhigh`
-  - 复杂架构 Review、高风险改造、疑难并发或底层 Bug：`--effort max`
-  - 极小机械改动/快速冒烟验证时可临时降为 `--effort high` 或 `medium`
-- `--safe`：实现模式下降级为 `--sandbox workspace-write`（默认使用 `--dangerously-bypass-approvals-and-sandbox`，适配可回退 VM 内的无人值守长任务）。
-- `--model <model>`：为本次任务显式指定 Codex 模型。
-
-执行建议：
-- `codex exec` 属于耗时操作，调用 `run_command` 时设置合理的 `NotificationTimeoutSeconds`（如 180~300 秒），等待异步完成通知，不要循环轮询。
-- 脚本会自动检测非 Git 目录并附加 `--skip-git-repo-check`。
-- 若当前仍开启了 Antigravity 沙箱，该命令需要外网与 `~/.codex` 凭证，按沙箱外执行处理。
-
-## 5. 强制审查与验收闭环
-
-Codex 退出后，**必须依次完成以下步骤**，不得跳过：
-
-1. **读取 Codex 执行报告**：查看脚本输出的 `REPORT_FILE` 路径对应的报告内容。
-2. **审查真实改动**：运行 `git status` 与 `git diff`，核对：
-   - 是否严格在任务单允许的范围内改动；
-   - 实现逻辑是否符合架构与接口契约；
-   - **是否引入了过度防御式编程或超出 Non-Goals 的冗余复杂度**（若代码臃肿难懂，要求精简）；
-   - 是否残留调试代码、临时文件或误改配置。
-3. **亲自运行验收命令**：独立跑一遍任务单中的测试、类型检查或构建命令。
-4. **返工或收尾**：
-   - 若验收未通过或代码质量不达标：将具体报错、diff 问题和修复要求追加到新任务单（或原任务单的“返工要求”节），再次派单给 Codex。
-   - 若全部通过：将 Codex 的原始汇报与审查结论**重新梳理、提炼并润色为通俗清晰的表述**（避免直接照搬 Codex 晦涩生硬的原话），向用户汇报本次交付内容、关键架构取舍、变更文件与验收结果，并推进下一个任务。
+1. **筛查第二层 Gap（Codex 自行假设审查）**：读取 `REPORT_FILE`，重点检查 Codex 汇报的**“未明确规定、自行做出的假设与决定（Unstated Decisions）”**，用**三条门槛**过筛：
+   - 属于无关紧要实现细节（Defaults）→ 放行；
+   - 命中高代价/危险、莫名其妙的数字限制或跨边界耦合（Gap）→ 必须拦截裁决（不合理则返工；涉及业务/产品意图则提请用户拍板）。
+2. **分层审查真实改动**：运行 `git status` 与 `git diff`：
+   - 慢层代码（边界契约、数据结构、主流程、权限、删除逻辑）逐行细读，内部细节抽查；
+   - 核查是否越界修改、是否偷改/弱化测试标准、是否塞入超出 `Non-Goals` 的冗余防御代码。
+3. **亲自运行验收命令 & 按需独立复审**：
+   - 独立跑通任务单中的全部测试、构建或类型检查命令（警惕“绿灯骗人”，确认核心承诺真被测到）；
+   - 若属慢层/高爆炸半径改动，可额外运行 `run-codex.sh --code-review --effort xhigh <task-file> [workdir]` 做写审分离复核，并对复核意见同样做轻重权衡，不盲目全收。
+4. **把知识搬出会话（原地更新，不写流水账）**：
+   - 若本次产生了命中“三条门槛”的决定或重要否决方案，在结束前用 **3~5 行**（决定 / 理由 / 否决方案 / 影响）**原地更新**进仓库 `AGENTS.md`（长期契约）或 `docs/design/<feature>.md`（特性设计），防止会话压缩或重开后失忆。
+5. **润色汇报（防认知债）**：
+   - 严禁原样粘贴 Codex 生硬晦涩的报告；将其提炼润色为简短、好读的自然中文，向用户清晰说明：**兑现了什么行为承诺、关键取舍与否决理由、筛出的待拍板项（若有）以及验收结果**。
