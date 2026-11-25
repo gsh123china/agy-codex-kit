@@ -39,7 +39,7 @@ PARSED="$(
       elif cur_tokens > 0 then
         cur_tokens
       else
-        (($d.context_window.total_input_tokens // 0) + ($d.context_window.total_output_tokens // 0))
+        ($d.context_window.total_input_tokens // 0)
       end;
     [
       ($d.agent_state // "idle"),
