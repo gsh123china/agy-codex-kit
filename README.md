@@ -12,6 +12,7 @@
 
 ```text
 agy-codex-kit/
+├── AGENTS.md                                   # 本仓库专属自举维护契约（不纳入 install.sh 部署）
 ├── README.md                                   # 使用与部署说明
 ├── .gitignore                                  # 禁止提交密钥、本地备份与宿主机私密配置
 ├── install.sh                                  # 幂等软链部署脚本（自动备份旧文件，支持 --uninstall）
