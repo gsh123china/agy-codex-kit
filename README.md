@@ -24,9 +24,9 @@ agy-codex-kit/
 │           └── scripts/
 │               └── run-codex.sh                # 封装 codex exec（--review / --code-review / --resume / --effort / --safe）
 ├── templates/                                  # 新代码仓库初始化模板（一页可读，原地更新）
-│   ├── AGENTS.md.template                      # 共读仓库契约（模块数据归属、不变量、关键决策溯源）
-│   ├── design-doc.md.template                  # 短设计方案模板（意图红线、快慢层边界、否决方案、行为评估）
-│   └── task-spec.md.template                   # 原子任务单模板（Non-Goals、禁改测试标准、强制汇报自行假设）
+│   ├── AGENTS.md.template                      # 共读仓库契约（核心/CLI/GUI 边界、数据归属、不变量与决策溯源）
+│   ├── design-doc.md.template                  # 短设计方案模板（意图红线、双入口机器接口、否决方案、AI 评估闭环）
+│   └── task-spec.md.template                   # 原子任务单模板（Non-Goals、禁改测试标准、定量验收与自行假设汇报）
 ├── examples/                                   # 脱敏配置参考（绝不自动覆盖宿主机）
 │   ├── codex.config.toml.example               # ~/.codex/config.toml 参考
 │   └── antigravity.settings.json.example       # ~/.gemini/antigravity-cli/settings.json 参考
