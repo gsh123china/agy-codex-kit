@@ -73,10 +73,10 @@ cd ~/agy-codex-kit
 # 1. 编码前：设计方案只读 Review（不改代码，输出分级风险与复杂度代价）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --review --effort xhigh docs/design/feature.md .
 
-# 2. 编码中：派发原子任务单落地实现（强制汇报自行假设 Unstated Decisions）
+# 2. 编码中：派发原子任务单落地实现（局部细节汇报 Unstated Decisions；遇硬冲突零改动输出 [BLOCKED] 停手提问）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --effort xhigh docs/tasks/T01.md .
 
-# 3. 小偏差返工：续接上次 session 定向修复（同一问题最多连续 --resume 2 次，超限回退重开新会话）
+# 3. 澄清续接 / 小偏差返工：解答 [BLOCKED] 提问，或续接上次 session 定向修复（错误返工最多连续 2 次）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --resume <session-id> --effort xhigh docs/tasks/T01-rework.md .
 
 # 4. 编码后（慢层/高风险改动按需调用）：独立干净会话只读代码审查（写审分离）

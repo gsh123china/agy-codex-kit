@@ -8,7 +8,7 @@ Usage: run-codex.sh [OPTIONS] <doc-or-task-file> [workdir]
 Options:
   --review                 Pre-implementation read-only design review (`--sandbox read-only`)
   --code-review            Post-implementation independent read-only code review (`--sandbox read-only`)
-  --resume <session-id>    Resume an existing Codex session for targeted rework (max 2 retries recommended)
+  --resume <session-id>    Resume session for [BLOCKED] clarification or targeted rework (max 2 rework retries)
   --safe                   Use `--sandbox workspace-write` (exec) / omit full bypass (resume)
   --effort <level>         Override reasoning effort (low|medium|high|xhigh|max)
   --model <model>          Override Codex model for this run
@@ -153,7 +153,7 @@ if [[ -n "$RESUME_ID" ]]; then
   if [[ -n "$EFFORT" ]]; then
     CMD+=(-c "model_reasoning_effort=\"$EFFORT\"")
   fi
-  PROMPT="请阅读返工/补充说明 ${TASK_FILE}，在当前会话上下文基础上严格按修改范围与 Non-Goals 完成修复，并重新运行全部验收命令（严禁为使测试通过而删改、放宽既有测试断言或验收标准，严禁执行 git add/commit/push）。完成后输出简洁中文汇报，包含：1) 本次返工修改的文件；2) 运行的验收命令及实际结果；3) 任何未解决的问题或残余风险；4) 本次新增的自行假设与决定（Unstated Decisions，若无请写“无”）。"
+  PROMPT="请阅读澄清裁决或返工说明 ${TASK_FILE}，在当前会话上下文基础上严格按修改范围与 Non-Goals 完成代码落地或定向修复（若仍发现新的代码库事实硬冲突、禁改范围冲突或未授权高危破坏性分叉，同样禁止盲猜硬改，须保持无本轮残留污染改动并在汇报首行输出 [BLOCKED] 列出代码证据与待确认问题），并亲自运行全部验收命令（严禁为使测试通过而删改、放宽既有测试断言或验收标准，严禁执行 git add/commit/push）。正常完成后输出简洁中文汇报，包含：1) 本次修改/新增的文件清单；2) 运行的验收命令及实际结果；3) 任何未解决的问题或残余风险；4) 本次新增的自行假设与决定（Unstated Decisions，若无请写“无”）。"
   CMD+=("$RESUME_ID" "$PROMPT")
 elif [[ "$REVIEW_MODE" -eq 1 ]]; then
   MODE="review"
@@ -200,7 +200,7 @@ else
   if [[ -n "$EFFORT" ]]; then
     CMD+=(-c "model_reasoning_effort=\"$EFFORT\"")
   fi
-  PROMPT="请先阅读仓库中的 AGENTS.md（若存在），然后完整阅读任务单 ${TASK_FILE}。严格按照任务单的目标、修改范围、约束与 Non-Goals（明确不做项，禁止对已排除的极端边界做过度防御式编程）完成代码落地，并亲自运行任务单中的全部验收命令（严禁为使测试通过而删改、放宽既有测试断言或验收标准；新增测试优先验证外部可观测行为；严禁执行 git add/commit/push）。完成后输出简洁清晰的中文汇报，必须包含：1) 修改/新增的文件清单；2) 运行的验收命令及实际结果；3) 任何未解决的问题或残余风险；4) 任务单未明确规定、你在实现中自行做出的假设与决定（Unstated Decisions，若无请写“无”）。"
+  PROMPT="请先阅读仓库中的 AGENTS.md（若存在），然后完整阅读任务单 ${TASK_FILE}。在动手修改代码前先核对代码库事实与边界契约，对未明说之处按两级处理：若仅为低回退代价的局部实现细节，请勿中断执行，自行采用简洁合理的默认方案并在最终汇报的 Unstated Decisions 中如实单列；若发现**阻塞级冲突或高危歧义**（任务单假设的文件/符号/调用链与真实代码库严重不符、兑现目标必须触碰禁改范围或违背 AGENTS.md 核心数据归属、或面临未授权的数据删除/公共契约破坏性分叉），**严禁盲猜硬改**——请保持工作区无本任务残留改动并立即停止实现，在最终汇报首行固定输出 [BLOCKED]，紧接着简明列出：1) 冲突或受阻的代码库事实证据（文件路径与行号）；2) 待拍板的具体问题与简要备选方案（不超过 2~3 项）。确认无阻塞后，严格按照任务单的目标、修改范围、约束与 Non-Goals（明确不做项，禁止对已排除的极端边界做过度防御式编程）完成代码落地，并亲自运行任务单中的全部验收命令（严禁为使测试通过而删改、放宽既有测试断言或验收标准；新增测试优先验证外部可观测行为；严禁执行 git add/commit/push）。正常完成后输出简洁清晰的中文汇报，必须包含：1) 修改/新增的文件清单；2) 运行的验收命令及实际结果；3) 任何未解决的问题或残余风险；4) 任务单未明确规定、你在实现中自行做出的假设与决定（Unstated Decisions，若无请写“无”）。"
   CMD+=("$PROMPT")
 fi
 

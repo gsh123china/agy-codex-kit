@@ -14,7 +14,9 @@ flowchart LR
     CR -->|"4. 分级风险 + 复杂度代价"| W["Antigravity 架构权衡"]
     W -->|"5. 骨架先行 + Non-Goals + 拆原子单"| T["任务单 docs/tasks/*.md"]
     T -->|"6. run-codex.sh 独立会话落地"| C["Codex（执行工程师）"]
-    C -->|"7. 实现 + 主动交代自行假设"| R["/tmp/codex-reports/*.md"]
+    C -->|"遇硬冲突/高危歧义：零改动输出 [BLOCKED]"| B["Antigravity 裁决 / 转问用户"]
+    B -->|"--resume 澄清续接（不计入返工次数）"| C
+    C -->|"7. 正常完成 + 主动交代自行假设"| R["/tmp/codex-reports/*.md"]
     R --> A2["Antigravity 终验（可选 --code-review）"]
     A2 -->|"8. 筛第二层 Gap + 审 diff + 跑评估"| V{"通过？（最多2次 --resume）"}
     V -->|"第 1~2 次小偏差：定向返工"| T
@@ -26,7 +28,7 @@ flowchart LR
 
 | 纪律 | 解决的痛点 | 在本协作体系中的落地机制 |
 | :--- | :--- | :--- |
-| **双层 Gap 穿透**（Spec / Defaults / Gap） | Agent 私自替人做决定，会话一关只剩代码知道“是什么”却不知“为什么” | **对上**：Antigravity 用“三条门槛”区分 Defaults（直接定）与 Gap（先问用户）；**对下**：`run-codex.sh` 强制要求 Codex 在报告中单列**未明说但自行做出的假设（Unstated Decisions）**，终验时逐条过筛 |
+| **双层 Gap 穿透**（Spec / Defaults / Gap） | Agent 私自替人做决定，或无头模式下遇冲突盲猜硬改污染代码 | **对上**：Antigravity 用“三条门槛”区分 Defaults（直接定）与 Gap（先问用户）；**对下**：`run-codex.sh` 对疑问做两级分流——低风险细节自行采用默认方案并单列 **`Unstated Decisions`** 供终验过筛，遇事实硬冲突/越界/高危歧义则零改动停手输出 **`[BLOCKED]`**，由 Antigravity 裁决（或向用户提问）后 `--resume` 续接 |
 | **三条门槛筛重留轻** | 什么都记会淹没在噪音里，什么都不记系统会失忆 | 仅当决定满足任一条时才升格为必审 Gap / 必记溯源：① **回退代价高或危险**（钱、数据完整性、删除、安全、对外契约）；② **内行外人看莫名其妙**（魔法数字、反直觉限制）；③ **跨模块边界与数据归属** |
 | **骨架先行 + 快慢层分级** | 模块切太碎导致接缝爆炸；底层小改动引发全局故障 | 按“独立变化的决策 + **数据归属**”划边界，多模块先派**最简端到端骨架单（Walking Skeleton）**；区分**快层**（UI/文案）与**慢层**（核心模型、公共契约、换底层库、**删旧功能**），慢层必做前置 `--review` |
 | **机器接口先行**（GUI 不复制算法，CLI 是正式机器接口） | 带界面程序让 AI 操控 GUI 或靠多模态截图猜感官效果，慢、脆且难以定量沟通 | 新建带 GUI 项目或新功能/模块时，核心算法必须与 UI 解耦下沉，同步提供无头 CLI / 文件批处理入口并输出 `CSV`/`JSON` 结构化文本，支撑 AI 自动跑通 `修改 → 运行 → 定量评估 → 继续修改` 闭环 |
@@ -76,8 +78,8 @@ flowchart LR
 2. **全局派单 Skill**：[`~/.gemini/config/skills/codex-executor/SKILL.md`](../antigravity/skills/codex-executor/SKILL.md)
 3. **全局执行脚本**：[`~/.gemini/config/skills/codex-executor/scripts/run-codex.sh`](../antigravity/skills/codex-executor/scripts/run-codex.sh)
    * 自动补全 `mise` / `~/.local/bin` / `~/.bun/bin` 到 `PATH`；
-   * 支持四种模式：编码前 `--review`（只读设计审查）、默认 `exec`（原子任务实现）、`--resume`（最多 2 次定向返工）、编码后 `--code-review`（干净会话只读代码复审，写审分离）；
-   * 强制要求实现/返工汇报单列 `Unstated Decisions`（自行假设），并明令禁止篡改既有测试标准或自动提交 Git；
+   * 支持四种模式：编码前 `--review`（只读设计审查）、默认 `exec`（原子任务实现）、`--resume`（`[BLOCKED]` 澄清续接或最多 2 次定向返工）、编码后 `--code-review`（干净会话只读代码复审，写审分离）；
+   * 无头疑问两级分流：局部细节单列 `Unstated Decisions`（自行假设），遇事实硬冲突/禁改越界/高危分叉则零改动输出 `[BLOCKED]` 停手待答；明令禁止篡改既有测试标准或自动提交 Git；
    * 自动将报告写入 `/tmp/codex-reports/[review-|code-review-|resume-]<task>-<timestamp>.md`。
 4. **自定义底部状态栏**：[`~/.gemini/antigravity-cli/statusline.sh`](../antigravity/statusline.sh)
 
@@ -112,8 +114,8 @@ bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --review --effo
 # 2) 编码中：派发原子任务单落地实现（一单只做一件事）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --effort xhigh <task-file> [workdir]
 
-# 3) 小偏差返工：续接上次会话定向修复（注意：同一问题最多连续 --resume 2 次，超限请回退并开新会话）
-bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --resume <session-id> --effort xhigh <rework-file> [workdir]
+# 3) 澄清续接或小偏差返工：解答 [BLOCKED] 阻塞问题（不计入熔断），或对代码偏差做定向修复（最多连续 2 次）
+bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --resume <session-id> --effort xhigh <clarify-or-rework-file> [workdir]
 
 # 4) 编码后（慢层/高风险改动按需调用）：开启独立干净会话做只读代码复审（写审分离）
 bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --code-review --effort xhigh <task-or-design-file> [workdir]
