@@ -9,7 +9,7 @@ Options:
   --review                 Pre-implementation read-only design review (`--sandbox read-only`)
   --code-review            Post-implementation independent read-only code review (`--sandbox read-only`)
   --resume <session-id>    Resume session for [BLOCKED] clarification or targeted rework (max 2 rework retries)
-  --safe                   Use `--sandbox workspace-write` (exec) / omit full bypass (resume)
+  --safe                   Use `--sandbox workspace-write` (exec & resume)
   --effort <level>         Override reasoning effort (low|medium|high|xhigh|max)
   --model <model>          Override Codex model for this run
   -h, --help               Show this help
@@ -18,6 +18,7 @@ EOF
 
 TASK_FILE=""
 WORKDIR="$(pwd)"
+WORKDIR_SET=0
 REVIEW_MODE=0
 CODE_REVIEW_MODE=0
 RESUME_ID=""
@@ -70,8 +71,13 @@ while [[ $# -gt 0 ]]; do
     *)
       if [[ -z "$TASK_FILE" ]]; then
         TASK_FILE="$1"
-      else
+      elif [[ "$WORKDIR_SET" -eq 0 ]]; then
         WORKDIR="$1"
+        WORKDIR_SET=1
+      else
+        echo "Error: unexpected extra argument: $1" >&2
+        usage >&2
+        exit 2
       fi
       shift
       ;;
@@ -96,6 +102,11 @@ fi
 
 if [[ ! -f "$TASK_FILE" ]]; then
   echo "Error: file not found: $TASK_FILE" >&2
+  exit 2
+fi
+
+if [[ ! -d "$WORKDIR" ]]; then
+  echo "Error: workdir directory not found: $WORKDIR" >&2
   exit 2
 fi
 
@@ -141,7 +152,9 @@ if [[ -n "$RESUME_ID" ]]; then
   MODE="resume"
   REPORT_FILE="${REPORT_DIR}/resume-${TASK_SLUG}-${TIMESTAMP}.md"
   CMD=(codex exec resume --output-last-message "$REPORT_FILE")
-  if [[ "$SAFE_MODE" -eq 0 ]]; then
+  if [[ "$SAFE_MODE" -eq 1 ]]; then
+    CMD+=(-c 'sandbox_mode="workspace-write"')
+  else
     CMD+=(--dangerously-bypass-approvals-and-sandbox)
   fi
   if [[ "$IS_GIT_REPO" -eq 0 ]]; then
@@ -180,7 +193,7 @@ elif [[ "$CODE_REVIEW_MODE" -eq 1 ]]; then
   if [[ -n "$EFFORT" ]]; then
     CMD+=(-c "model_reasoning_effort=\"$EFFORT\"")
   fi
-  PROMPT="这是一次独立的**落地后只读代码审查（写审分离）**，请勿修改任何文件。你在未参与原编码推理过程的前提下担任严格审查者：请先阅读仓库中的 AGENTS.md（若存在）及任务/设计要求 ${TASK_FILE}，再依次核查 git status --short、git diff HEAD（同时覆盖已暂存与未暂存改动）以及状态为 ?? 的新增未跟踪文件内容（若工作区完全干净，仅在最近一次提交确系对应本任务时审查 git show，否则明确报告缺少可确认的改动基线）。请从严挑错并重点核查：1) 要求承诺的外部可观测行为、并发/异常边界是否真正兑现，测试是否为验证外部承诺的“行为评估”而非表面绿灯或绑死内部实现；2) 是否存在为通过测试而删改、放宽既有测试断言或验收标准的行为；3) 是否越出允许修改范围、破坏模块数据归属/跨边界契约（如在 GUI/表现层复制或混写核心算法逻辑），或混入超出 Non-Goals 的过度防御式冗余代码；4) 代码中是否藏有任务单未授权的高风险隐性假设（如来历不明的魔法数字、静默吞错、未评估影响面的删除）。请按 [Blocker / 必须返工]、[Important / 重要隐患或隐性 Gap]、[Minor / 可选优化] 分组输出简明中文审查报告，无问题项无需凑数。"
+  PROMPT="这是一次独立的**落地后只读代码审查（写审分离）**，请勿修改任何文件。你在未参与原编码推理过程的前提下担任严格审查者：请先阅读仓库中的 AGENTS.md（若存在）及任务/设计要求 ${TASK_FILE}，再依次核查 git status --short -uall（展开新增子目录内的全部未跟踪文件）、git diff HEAD（同时覆盖已暂存与未暂存改动；若仓库尚无首个提交无 HEAD，则直接审查全部暂存与未跟踪文件）以及状态为 ?? 的新增未跟踪文件内容（若工作区完全干净，仅在最近一次提交确系对应本任务时审查 git show，否则明确报告缺少可确认的改动基线）。请从严挑错并重点核查：1) 要求承诺的外部可观测行为、并发/异常边界是否真正兑现，测试是否为验证外部承诺的“行为评估”而非表面绿灯或绑死内部实现；2) 是否存在为通过测试而删改、放宽既有测试断言或验收标准的行为；3) 是否越出允许修改范围、破坏模块数据归属/跨边界契约（如在 GUI/表现层复制或混写核心算法逻辑），或混入超出 Non-Goals 的过度防御式冗余代码；4) 代码中是否藏有任务单未授权的高风险隐性假设（如来历不明的魔法数字、静默吞错、未评估影响面的删除）。请按 [Blocker / 必须返工]、[Important / 重要隐患或隐性 Gap]、[Minor / 可选优化] 分组输出简明中文审查报告，无问题项无需凑数。"
   CMD+=("$PROMPT")
 else
   MODE="exec"
@@ -215,11 +228,31 @@ if [[ -n "$RESUME_ID" ]]; then
   echo "RESUME_ID=$RESUME_ID"
 fi
 
+STDERR_LOG="$(mktemp "${REPORT_DIR}/.stderr-${TIMESTAMP}.XXXXXX")"
+cleanup() {
+  rm -f "$STDERR_LOG"
+}
+trap cleanup EXIT
+
 if [[ "$MODE" == "resume" ]]; then
-  (cd "$WORKDIR" && "${CMD[@]}")
+  ((cd "$WORKDIR" && "${CMD[@]}") 3>&1 1>&2 2>&3 | tee "$STDERR_LOG") 3>&1 1>&2 2>&3
 else
-  "${CMD[@]}"
+  ("${CMD[@]}" 3>&1 1>&2 2>&3 | tee "$STDERR_LOG") 3>&1 1>&2 2>&3
 fi
 
+SESSION_ID="$RESUME_ID"
+if [[ -z "$SESSION_ID" && -f "$STDERR_LOG" ]]; then
+  SESSION_ID="$(sed -n 's/^session id:[[:space:]]*\([0-9a-fA-F-]\+\).*$/\1/p' "$STDERR_LOG" | head -n 1)"
+fi
+
+CODEX_STATUS="OK"
+if [[ -f "$REPORT_FILE" ]] && awk 'NF { exit ($0 ~ /^\[BLOCKED\]/ ? 0 : 1) } END { if (NR == 0) exit 1 }' "$REPORT_FILE"; then
+  CODEX_STATUS="BLOCKED"
+fi
+
+if [[ -n "$SESSION_ID" ]]; then
+  echo "SESSION_ID=$SESSION_ID"
+fi
+echo "CODEX_STATUS=$CODEX_STATUS"
 echo "CODEX_DONE=1"
 echo "REPORT_FILE=$REPORT_FILE"

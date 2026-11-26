@@ -6,6 +6,7 @@
   },
   "permissions": {
     "allow": [
+      "command(regex:bash .*/run-codex\\.sh.*)",
       "command(codex exec)"
     ]
   }

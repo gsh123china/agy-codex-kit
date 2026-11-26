@@ -56,7 +56,7 @@ cd ~/agy-codex-kit
 
 ### 3. 按机器安全等级配置权限
 * **隔离虚拟机 / 无人值守长任务**：在 `agy` 内执行 `/config` 切换为 `Turbo`，或用 `agy --dangerously-skip-permissions` 启动；
-* **主力机 / 敏感环境**：保持 `Default` 或 `Auto` 沙箱，在 `/permissions` 中放行 `command(codex exec)`，派单时传 `--safe`。
+* **主力机 / 敏感环境**：保持 `Default` 或 `Auto` 沙箱，参考 `examples/antigravity.settings.json.example` 放行 `run-codex.sh` 与 `codex exec`（注：默认沙箱禁外网，触发沙箱外执行时需允许访问宿主机 `~/.codex` 与网络），派单时传 `--safe`。
 
 重启一次 `agy` 会话即可生效。
 

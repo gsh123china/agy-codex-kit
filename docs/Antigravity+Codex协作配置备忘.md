@@ -80,7 +80,7 @@ flowchart LR
    * 自动补全 `mise` / `~/.local/bin` / `~/.bun/bin` 到 `PATH`；
    * 支持四种模式：编码前 `--review`（只读设计审查）、默认 `exec`（原子任务实现）、`--resume`（`[BLOCKED]` 澄清续接或最多 2 次定向返工）、编码后 `--code-review`（干净会话只读代码复审，写审分离）；
    * 无头疑问两级分流：局部细节单列 `Unstated Decisions`（自行假设），遇事实硬冲突/禁改越界/高危分叉则零改动输出 `[BLOCKED]` 停手待答；明令禁止篡改既有测试标准或自动提交 Git；
-   * 自动将报告写入 `/tmp/codex-reports/[review-|code-review-|resume-]<task>-<timestamp>.md`。
+   * 自动将报告写入 `/tmp/codex-reports/[review-|code-review-|resume-]<task>-<timestamp>.md`，并在末尾标准输出打印 `SESSION_ID` 与 `CODEX_STATUS=OK|BLOCKED` 便于直接判定与续接。
 4. **自定义底部状态栏**：[`~/.gemini/antigravity-cli/statusline.sh`](../antigravity/statusline.sh)
 
 ---
@@ -96,7 +96,7 @@ flowchart LR
 ### 1. Antigravity 侧（虚拟机最大权限配置）
 * **方式 A（持久化，推荐）**：在 Antigravity CLI 中输入 `/config` 或 `/permissions`，将权限预设切换为 **`Turbo`**。
 * **方式 B（按会话生效）**：启动 CLI 时携带参数 `agy --dangerously-skip-permissions`。
-* **备选（非 VM / 敏感环境）**：保持 `Default` 或 `Auto` 预设，在 `/permissions` 中仅放行 `command(codex exec)`，派单时启用 `--safe`。
+* **备选（非 VM / 敏感环境）**：保持 `Default` 或 `Auto` 预设，参考 `examples/antigravity.settings.json.example` 在 `/permissions` 中放行 `command(regex:bash .*/run-codex\.sh.*)` 与 `command(codex exec)`（并在沙箱外执行提示时允许宿主机网络），派单时启用 `--safe`。
 
 ### 2. Codex 侧
 * **默认（VM 无人值守模式）**：`run-codex.sh` 在 `exec`/`resume` 下附加 `--dangerously-bypass-approvals-and-sandbox`；`--review` 与 `--code-review` 始终强制 `--sandbox read-only`。

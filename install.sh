@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 GEMINI_HOME="${GEMINI_HOME:-$HOME/.gemini}"
 SKILLS_TARGET_DIR="$GEMINI_HOME/config/skills"
 CLI_HOME="$GEMINI_HOME/antigravity-cli"
@@ -60,10 +60,13 @@ link_item() {
 
   mkdir -p "$(dirname "$target")"
 
+  local src_real
+  src_real="$(readlink -f "$src" 2>/dev/null || printf '%s' "$src")"
+
   if [[ -L "$target" ]]; then
     local current
     current="$(readlink -f "$target" 2>/dev/null || true)"
-    if [[ "$current" == "$src" ]]; then
+    if [[ -n "$current" && "$current" == "$src_real" ]]; then
       echo "[ok]     $target -> $src (already linked)"
       return 0
     fi
@@ -79,11 +82,13 @@ link_item() {
 unlink_if_ours() {
   local src="$1"
   local target="$2"
+  local src_real
+  src_real="$(readlink -f "$src" 2>/dev/null || printf '%s' "$src")"
 
   if [[ -L "$target" ]]; then
     local current
     current="$(readlink -f "$target" 2>/dev/null || true)"
-    if [[ "$current" == "$src" ]]; then
+    if [[ -n "$current" && "$current" == "$src_real" ]]; then
       rm "$target"
       echo "[unlink] $target"
       return 0
@@ -132,11 +137,23 @@ done
 
 echo ""
 echo "=== Environment Check ==="
+FALLBACK_DIRS=("$HOME/.local/share/mise/shims" "$HOME/.local/bin" "$HOME/.bun/bin")
 for bin in agy codex git jq; do
   if command -v "$bin" >/dev/null 2>&1; then
     echo "[ok]      $bin: $(command -v "$bin")"
   else
-    echo "[missing] $bin not found in PATH"
+    found_alt=""
+    for d in "${FALLBACK_DIRS[@]}"; do
+      if [[ -x "$d/$bin" ]]; then
+        found_alt="$d/$bin"
+        break
+      fi
+    done
+    if [[ -n "$found_alt" ]]; then
+      echo "[ok]      $bin: $found_alt (found via user bin fallback)"
+    else
+      echo "[missing] $bin not found in PATH"
+    fi
   fi
 done
 
@@ -153,6 +170,6 @@ cat <<'EOF'
      codex login
 2. Configure Antigravity permission preset for this machine:
    - Isolated VM / unattended long tasks: run `/config` -> Turbo, or launch `agy --dangerously-skip-permissions`
-   - Main workstation: keep Default/Auto and allow `command(codex exec)` via `/permissions`
+   - Main workstation: keep Default/Auto and allow `run-codex.sh` / `codex exec` via `/permissions` (see examples/antigravity.settings.json.example)
 3. Start a new `agy` session so the global GEMINI.md and skills take effect.
 EOF
