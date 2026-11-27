@@ -8,7 +8,7 @@
 - **契约联动地图**：凡修改核心协作协议、命令行参数或输出信号（如 `[BLOCKED]`、`CODEX_STATUS`、`--code-review`），必须同步核查 `GEMINI.md`、`SKILL.md`、`run-codex.sh`、`templates/*`、`README.md` 与 `docs/Antigravity+Codex协作配置备忘.md`。
 
 ## 2. 自举专属安全规程（Stage 1 → Stage 2）
-- **禁止运行中覆写宿主脚本**：`~/.gemini/` 直接软链至本仓库。若需通过 Codex 修改 `run-codex.sh` 自身，必须先复制稳定副本（如 `cp antigravity/skills/codex-executor/scripts/run-codex.sh /tmp/run-codex-host.sh`）作为宿主驱动，严禁让运行中的 `run-codex.sh` 直接覆写自身；改完后再用仓库新版跑自检。
+- **禁止运行中覆写宿主脚本**：`~/.gemini/` 直接软链至本仓库。若需通过 Codex 修改 `run-codex.sh` 自身，必须先复制独占稳定副本（如 `HOST_D="$(mktemp -d)" && cp antigravity/skills/codex-executor/scripts/run-codex.sh "$HOST_D/run-codex.sh"`，保留原文件名以兼容权限放行正则并防并行冲突）作为宿主驱动，严禁让运行中的 `run-codex.sh` 直接覆写自身；改完后再用仓库新版跑自检与清理 `$HOST_D`。
 - **微缩靶场验收**：涉及协作流程、提示词或脚本行为变更时，须在 `/tmp/` 建立临时沙箱仓库实测跑通闭环，并在验收后清理临时目录与测试报告。
 - **生效边界**：已有脚本与 `SKILL.md` 修改经软链即时生效；新增脚本或 Skill 目录需补跑 `./install.sh`；修改 `antigravity/GEMINI.md` 后需新开 `agy` 会话加载最新全局系统提示词。
 
@@ -19,16 +19,19 @@
 
 ## 4. 标准无头验收命令
 ```bash
-# 1) 脚本语法、JSON 格式、GEMINI.md 行预算与宿主机路径脱敏检查
-bash -n install.sh antigravity/statusline.sh antigravity/skills/codex-executor/scripts/run-codex.sh && \
+# 1) 逐文件脚本语法（用 && 串联防非 set -e 下假绿灯）、JSON 格式、行预算与路径脱敏检查
+bash -n install.sh && bash -n antigravity/statusline.sh && \
+bash -n antigravity/skills/codex-executor/scripts/run-codex.sh && \
 jq empty examples/antigravity.settings.json.example && \
 test "$(wc -l < antigravity/GEMINI.md)" -le 60 && \
 ! grep -rnE '/(home|Users)/[A-Za-z0-9._-]+' . --exclude-dir=.git
 
-# 2) 隔离环境安装幂等性及“不部署根目录 AGENTS.md”红线校验
+# 2) 隔离环境三项软链有效性与幂等零备份、以及“不部署根目录 AGENTS.md（含悬空软链）”校验
 TMP_G="$(mktemp -d)" && GEMINI_HOME="$TMP_G" ./install.sh >/dev/null && \
 GEMINI_HOME="$TMP_G" ./install.sh >/dev/null && \
-test ! -e "$TMP_G/AGENTS.md" && rm -rf "$TMP_G"
+(for p in GEMINI.md antigravity-cli/statusline.sh config/skills/codex-executor; do test -L "$TMP_G/$p" && test -e "$TMP_G/$p" || exit 1; done) && \
+test ! -d "$TMP_G/backups" && test ! -e "$TMP_G/AGENTS.md" && test ! -L "$TMP_G/AGENTS.md" && \
+rm -rf "$TMP_G"
 ```
 
 ## 5. 关键决策溯源

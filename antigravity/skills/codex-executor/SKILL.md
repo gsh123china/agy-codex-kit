@@ -77,7 +77,7 @@ bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --effort xhigh 
 
 Codex 退出后，**必须依次完成以下动作**，不得跳过：
 
-1. **先判别是否触发 `[BLOCKED]` 停手提问（模拟无头异步问答）**：检查脚本末尾输出的 `CODEX_STATUS`（或读取 `REPORT_FILE` 首行）：
+1. **先判别是否触发 `[BLOCKED]` 停手提问（仅针对 `exec`/`resume` 实现模式）**：检查脚本末尾输出的 `CODEX_STATUS`（或读取 `REPORT_FILE` 首行；注：`--review` 与 `--code-review` 的审查结论始终由架构师阅读报告分级裁决，不走 `[BLOCKED]` 标记）：
    - 若 `CODEX_STATUS=BLOCKED`（首行为 `[BLOCKED]`）：先跑 `git status` 确认 Codex 未留下污染改动，再审阅其列出的代码库冲突证据与待确认问题——属纯技术/内部契约的由 Antigravity 对照仓库真相直接裁决；触及**三条门槛**（意图/安全/对外契约/数据归属）的由 Antigravity 调用提问工具向用户确认拍板。随后将明确结论写入任务单或澄清说明，通过 `--resume <SESSION_ID>` 无损续接原会话继续落地（若问题暴露原任务单前提根本不成立，则直接重写任务单开新会话）。
 2. **筛查第二层 Gap（Codex 自行假设审查）**：正常完成时读取 `REPORT_FILE`，重点检查 Codex 汇报的**“未明确规定、自行做出的假设与决定（Unstated Decisions）”**，用**三条门槛**过筛：
    - 属于无关紧要实现细节（Defaults）→ 放行；

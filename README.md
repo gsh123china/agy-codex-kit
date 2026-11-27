@@ -18,7 +18,7 @@ agy-codex-kit/
 ├── install.sh                                  # 幂等软链部署脚本（自动备份旧文件，支持 --uninstall）
 ├── antigravity/                                # 自动软链到 ~/.gemini/
 │   ├── GEMINI.md                               # -> ~/.gemini/GEMINI.md（全局角色分工与架构权衡原则）
-│   ├── statusline.sh                           # -> ~/.gemini/antigravity-cli/statusline.sh（底部状态栏，展示已用上下文大小）
+│   ├── statusline.sh                           # -> ~/.gemini/antigravity-cli/statusline.sh（底部状态栏，展示上下文用量与缓存命中率）
 │   └── skills/
 │       └── codex-executor/                     # -> ~/.gemini/config/skills/codex-executor
 │           ├── SKILL.md                        # 设计审查 / 拆单派发 / 写审分离验收 / 溯源闭环 SOP
@@ -85,7 +85,7 @@ bash ~/.gemini/config/skills/codex-executor/scripts/run-codex.sh --code-review -
 ```
 
 ### 多机同步与留档
-* 修改规则、Skill 或脚本后，直接在本仓库执行 `git diff` → `git commit` → `git push`；
+* 修改规则、Skill 或脚本并验收通过后，由维护者手动在本仓库执行 `git diff` → `git commit` → `git push`（Agent 默认禁止自动 commit，且永不执行 push）；
 * 其他机器只需 `git pull`（若新增了新的 Skill 目录，补跑一次 `./install.sh`）。
 
 ### 安全卸载

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+{
 set -euo pipefail
 
 usage() {
@@ -246,7 +247,15 @@ if [[ -z "$SESSION_ID" && -f "$STDERR_LOG" ]]; then
 fi
 
 CODEX_STATUS="OK"
-if [[ -f "$REPORT_FILE" ]] && awk 'NF { exit ($0 ~ /^\[BLOCKED\]/ ? 0 : 1) } END { if (NR == 0) exit 1 }' "$REPORT_FILE"; then
+if [[ ( "$MODE" == "exec" || "$MODE" == "resume" ) && -f "$REPORT_FILE" ]] && awk '
+  /[^[:space:]]/ {
+    seen = 1
+    sub(/^[[:space:]]+/, "")
+    blocked = ($0 ~ /^\[BLOCKED\]/ || $0 ~ /^\*\*\[BLOCKED\]\*\*/ || $0 ~ /^`\[BLOCKED\]`/)
+    exit (blocked ? 0 : 1)
+  }
+  END { if (!seen) exit 1 }
+' "$REPORT_FILE"; then
   CODEX_STATUS="BLOCKED"
 fi
 
@@ -256,3 +265,5 @@ fi
 echo "CODEX_STATUS=$CODEX_STATUS"
 echo "CODEX_DONE=1"
 echo "REPORT_FILE=$REPORT_FILE"
+exit 0
+}

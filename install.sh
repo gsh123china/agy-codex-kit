@@ -104,24 +104,37 @@ unlink_if_ours() {
 if [[ "$UNINSTALL" -eq 1 ]]; then
   echo "Uninstalling agy-codex-kit symlinks from $GEMINI_HOME ..."
   unlink_if_ours "$REPO_DIR/antigravity/GEMINI.md" "$GEMINI_HOME/GEMINI.md"
-  if [[ -f "$REPO_DIR/antigravity/statusline.sh" ]]; then
-    unlink_if_ours "$REPO_DIR/antigravity/statusline.sh" "$CLI_HOME/statusline.sh"
-  fi
+  unlink_if_ours "$REPO_DIR/antigravity/statusline.sh" "$CLI_HOME/statusline.sh"
   for skill_dir in "$REPO_DIR"/antigravity/skills/*; do
     [[ -d "$skill_dir" && -f "$skill_dir/SKILL.md" ]] || continue
     skill_name="$(basename "$skill_dir")"
     unlink_if_ours "$skill_dir" "$SKILLS_TARGET_DIR/$skill_name"
   done
+  if [[ -d "$SKILLS_TARGET_DIR" ]]; then
+    for link_path in "$SKILLS_TARGET_DIR"/*; do
+      [[ -L "$link_path" ]] || continue
+      raw_dest="$(readlink "$link_path" 2>/dev/null || true)"
+      [[ -n "$raw_dest" ]] || continue
+      if [[ "$raw_dest" != /* ]]; then
+        raw_dest="$(dirname "$link_path")/$raw_dest"
+      fi
+      norm_dest="$(realpath -m "$raw_dest" 2>/dev/null || printf '%s' "$raw_dest")"
+      if [[ "$norm_dest" == "$REPO_DIR/antigravity/skills/"* ]]; then
+        rm "$link_path"
+        echo "[unlink] $link_path (stale repo skill link)"
+      fi
+    done
+  fi
   echo "Done."
   exit 0
 fi
 
 echo "Installing agy-codex-kit from $REPO_DIR -> $GEMINI_HOME ..."
 
-# Ensure helper scripts are executable
-[[ -f "$REPO_DIR/antigravity/statusline.sh" ]] && chmod +x "$REPO_DIR/antigravity/statusline.sh"
+# Ensure helper scripts are executable (only chmod when missing +x so read-only mounts work)
+[[ -f "$REPO_DIR/antigravity/statusline.sh" && ! -x "$REPO_DIR/antigravity/statusline.sh" ]] && chmod +x "$REPO_DIR/antigravity/statusline.sh"
 for script in "$REPO_DIR"/antigravity/skills/*/scripts/*.sh; do
-  [[ -f "$script" ]] && chmod +x "$script"
+  [[ -f "$script" && ! -x "$script" ]] && chmod +x "$script"
 done
 
 link_item "$REPO_DIR/antigravity/GEMINI.md" "$GEMINI_HOME/GEMINI.md" "GEMINI.md"

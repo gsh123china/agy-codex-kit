@@ -41,12 +41,22 @@ PARSED="$(
       else
         ($d.context_window.total_input_tokens // 0)
       end;
+    def cache_pct:
+      if ($d.context_window.current_usage | type) == "object" then
+        (($d.context_window.current_usage.input_tokens // 0)
+        + ($d.context_window.current_usage.cache_creation_input_tokens // 0)
+        + ($d.context_window.current_usage.cache_read_input_tokens // 0)) as $in_total |
+        if $in_total > 0 then
+          (((($d.context_window.current_usage.cache_read_input_tokens // 0) * 100) / $in_total) | round)
+        else -1 end
+      else -1 end;
     [
       ($d.agent_state // "idle"),
       ($d.model.display_name // ""),
       ($d.context_window.used_percentage // 0),
       used_tokens,
       ($d.context_window.context_window_size // 0),
+      cache_pct,
       ($d.vcs.branch // ""),
       ($d.vcs.dirty // false),
       ($d.sandbox.enabled // false),
@@ -58,10 +68,10 @@ PARSED="$(
       (($d.workspace.current_dir // $d.cwd // "") | split("/") | last // ""),
       "END"
     ] | map(tostring | gsub("[\r\n\u001f]"; " ")) | join("\u001f")
-  ' 2>/dev/null || printf 'idle\037\0370\0370\0370\037\037false\037false\037\0370\0370\0370\037100\037\037END'
+  ' 2>/dev/null || printf 'idle\037\0370\0370\0370\037-1\037\037false\037false\037\0370\0370\0370\037100\037\037END'
 )"
 
-IFS=$'\x1f' read -r STATE MODEL USED_PCT USED_TOKENS WIN_SIZE VCS_BRANCH VCS_DIRTY SANDBOX CYCLE_MODE ARTIFACTS SUBAGENTS BG_TASKS COLS CWD_NAME _END <<< "$PARSED" || true
+IFS=$'\x1f' read -r STATE MODEL USED_PCT USED_TOKENS WIN_SIZE CACHE_PCT VCS_BRANCH VCS_DIRTY SANDBOX CYCLE_MODE ARTIFACTS SUBAGENTS BG_TASKS COLS CWD_NAME _END <<< "$PARSED" || true
 
 # ─── Format Helpers ──────────────────────────────────────────────────────────
 fmt_tokens() {
@@ -102,10 +112,23 @@ else
   CTX_NUM_COLOR="${FG_BRIGHT_WHITE}${B}"
 fi
 
+SEP="${FG_GRAY} │ ${R}"
+DOT="${FG_GRAY} · ${R}"
+
 if [[ "$WIN_SIZE" =~ ^[0-9]+$ ]] && (( WIN_SIZE > 0 )); then
   CTX="${FG_GRAY}ctx ${CTX_NUM_COLOR}${CTX_SIZE}${R} ${FG_GRAY}(${PCT_FMT}%)${R}"
 else
   CTX="${FG_GRAY}ctx ${CTX_NUM_COLOR}${CTX_SIZE}${R}"
+fi
+
+if [[ "$CACHE_PCT" =~ ^[0-9]+$ ]]; then
+  (( CACHE_PCT > 100 )) && CACHE_PCT=100
+  if (( CACHE_PCT >= 50 )); then
+    CACHE_COLOR="${FG_CYAN}"
+  else
+    CACHE_COLOR="${FG_WHITE}"
+  fi
+  CTX+="${DOT}${FG_GRAY}cache ${CACHE_COLOR}${CACHE_PCT}%${R}"
 fi
 
 # ─── State Indicator ─────────────────────────────────────────────────────────
@@ -119,8 +142,6 @@ case "$STATE" in
 esac
 
 # ─── Metadata Segments ───────────────────────────────────────────────────────
-SEP="${FG_GRAY} │ ${R}"
-DOT="${FG_GRAY} · ${R}"
 
 M=""
 [[ -n "$MODEL" ]] && M="${FG_GRAY} ╱ ${FG_BRIGHT_MAGENTA}${MODEL}${R}"
